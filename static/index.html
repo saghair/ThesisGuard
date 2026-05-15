@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThesisGuard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--border:#2a2a3a;
+  --accent:#7c6af7;--accent2:#4fd1c5;--accent3:#f6ad55;
+  --danger:#fc8181;--success:#68d391;--text:#e8e8f0;--muted:#6b6b8a;
+  --mono:'DM Mono',monospace;--sans:'Syne',sans-serif;--pad:clamp(14px,4vw,48px);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(124,106,247,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(124,106,247,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+/* Auth pages */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:var(--pad);position:relative;z-index:1;}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:clamp(24px,6vw,44px);width:100%;max-width:440px;}
+.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+.auth-logo-icon{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.auth-logo-text{font-size:16px;font-weight:700;}
+.auth-logo-sub{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.auth-card h2{font-size:22px;font-weight:800;margin-bottom:6px;}
+.auth-card .auth-sub{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:22px;line-height:1.5;}
+.auth-switch{text-align:center;margin-top:18px;font-family:var(--mono);font-size:12px;color:var(--muted);}
+.auth-switch a{color:var(--accent);cursor:pointer;text-decoration:none;}
+.auth-switch a:hover{text-decoration:underline;}
+.role-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.role-option{border:1px solid var(--border);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;}
+.role-option:hover{border-color:var(--accent);}
+.role-option.selected{border-color:var(--accent);background:rgba(124,106,247,.1);}
+.role-option .role-icon{font-size:24px;margin-bottom:6px;}
+.role-option .role-name{font-size:13px;font-weight:700;}
+.role-option .role-desc{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;}
+
+/* Header */
+header{position:sticky;top:0;z-index:100;padding:12px var(--pad);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(10,10,15,.96);backdrop-filter:blur(12px);gap:10px;}
+.logo{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.logo-text{font-size:15px;font-weight:700;}
+.logo-sub{font-family:var(--mono);font-size:10px;color:var(--muted);display:none;}
+@media(min-width:480px){.logo-sub{display:block;}}
+nav{display:flex;gap:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:1;}
+nav::-webkit-scrollbar{display:none;}
+.nav-btn{padding:7px 12px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--muted);font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.nav-btn:hover{color:var(--text);border-color:var(--border);}
+.nav-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(124,106,247,.08);}
+.header-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.user-chip{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--muted);}
+.role-badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;}
+.role-admin{background:rgba(252,129,129,.15);color:var(--danger);}
+.role-teacher{background:rgba(246,173,85,.15);color:var(--accent3);}
+.role-student{background:rgba(124,106,247,.15);color:var(--accent);}
+
+/* Pages */
+.page{display:none;position:relative;z-index:1;}
+.page.active{display:block;}
+.wrap{padding:var(--pad);max-width:1100px;margin:0 auto;}
+.wrap-sm{padding:var(--pad);max-width:900px;margin:0 auto;}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;gap:12px;flex-wrap:wrap;}
+.section-title{font-size:clamp(18px,4vw,28px);font-weight:800;letter-spacing:-.5px;}
+
+/* Stats */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+@media(max-width:700px){.stats-row{grid-template-columns:1fr 1fr;}}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);opacity:.5;}
+.stat-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+.stat-value{font-size:clamp(22px,5vw,32px);font-weight:800;letter-spacing:-1px;}
+
+/* Charts */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
+@media(max-width:640px){.charts-row{grid-template-columns:1fr;}}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
+.chart-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:16px;}
+
+/* Action cards */
+.actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:560px){.actions-grid{grid-template-columns:1fr;}}
+.action-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:all .25s;display:flex;align-items:flex-start;gap:14px;}
+.action-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 32px rgba(124,106,247,.12);}
+.action-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.action-icon.purple{background:rgba(124,106,247,.15);}
+.action-icon.teal{background:rgba(79,209,197,.15);}
+.action-icon.orange{background:rgba(246,173,85,.15);}
+.action-icon.red{background:rgba(252,129,129,.15);}
+.action-content h3{font-size:14px;font-weight:700;margin-bottom:4px;}
+.action-content p{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.5;}
+
+/* Card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px;}
+
+/* Buttons */
+.btn{padding:9px 18px;border-radius:8px;border:none;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#6a58e6;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger);}
+.btn-sm{padding:6px 12px;font-size:11px;}
+.btn-full{width:100%;padding:13px;font-size:15px;margin-top:4px;}
+
+/* Forms */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-full{grid-column:1/-1;}
+@media(max-width:560px){.form-grid{grid-template-columns:1fr;}.form-full{grid-column:1;}}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.field:last-child{margin-bottom:0;}
+label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s;width:100%;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+input::placeholder{color:var(--muted);}
+.margins-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
+.error-msg{color:var(--danger);font-family:var(--mono);font-size:12px;margin-top:10px;padding:10px;background:rgba(252,129,129,.08);border-radius:6px;border:1px solid rgba(252,129,129,.2);}
+
+/* Table */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);}
+td{padding:10px 12px;border-bottom:1px solid rgba(42,42,58,.5);vertical-align:middle;}
+tr:hover td{background:rgba(124,106,247,.03);}
+
+/* Tags */
+.tag{padding:3px 10px;border-radius:20px;font-family:var(--mono);font-size:10px;font-weight:600;}
+.tag-accent{background:rgba(124,106,247,.15);color:var(--accent);}
+.tag-teal{background:rgba(79,209,197,.15);color:var(--accent2);}
+.tag-success{background:rgba(104,211,145,.15);color:var(--success);}
+.tag-warning{background:rgba(246,173,85,.15);color:var(--accent3);}
+.tag-danger{background:rgba(252,129,129,.15);color:var(--danger);}
+
+/* Upload */
+.upload-zone{border:2px dashed var(--border);border-radius:16px;padding:clamp(28px,7vw,56px) var(--pad);text-align:center;cursor:pointer;transition:all .25s;margin-bottom:18px;background:var(--surface);position:relative;}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(124,106,247,.05);}
+.upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{font-size:38px;margin-bottom:10px;}
+.upload-zone h3{font-size:16px;font-weight:700;margin-bottom:6px;}
+.upload-zone p{font-family:var(--mono);font-size:12px;color:var(--muted);}
+.upload-selected{display:none;align-items:center;gap:10px;background:rgba(124,106,247,.08);border:1px solid var(--accent);border-radius:10px;padding:12px 16px;margin-bottom:14px;}
+.upload-selected.show{display:flex;}
+.upload-selected span{font-family:var(--mono);font-size:12px;word-break:break-all;}
+
+/* Report */
+.report-header{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+.report-filename{font-size:16px;font-weight:700;margin-bottom:6px;word-break:break-all;}
+.report-meta{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8;}
+.score-badge{text-align:right;flex-shrink:0;}
+.score-num{font-size:clamp(32px,7vw,48px);font-weight:800;letter-spacing:-2px;line-height:1;}
+.score-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px;}
+.score-high{color:var(--success);}
+.score-mid{color:var(--accent3);}
+.score-low{color:var(--danger);}
+.report-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+@media(max-width:600px){.report-grid{grid-template-columns:1fr;}}
+.report-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:12px;}
+.report-card-title{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.report-card-title::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+.risk-pill{display:inline-block;padding:4px 12px;border-radius:20px;font-family:var(--mono);font-size:11px;font-weight:600;text-transform:uppercase;}
+.risk-low{background:rgba(104,211,145,.15);color:var(--success);}
+.risk-medium{background:rgba(246,173,85,.15);color:var(--accent3);}
+.risk-high{background:rgba(252,129,129,.15);color:var(--danger);}
+.big-score{font-size:clamp(26px,5vw,38px);font-weight:800;letter-spacing:-1px;margin-bottom:4px;}
+.flag-item{background:var(--surface2);border-radius:8px;padding:10px 12px;border-left:3px solid var(--border);margin-bottom:6px;}
+.flag-item.error{border-left-color:var(--danger);}
+.flag-item.warning{border-left-color:var(--accent3);}
+.flag-label{font-size:12px;font-weight:700;margin-bottom:3px;}
+.flag-detail{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.5;}
+.hash-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:10px;color:var(--accent2);word-break:break-all;margin-top:8px;line-height:1.6;}
+.summary-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;}
+.passed-list{display:flex;flex-direction:column;gap:5px;margin-top:8px;}
+.passed-item{display:flex;align-items:flex-start;gap:8px;font-family:var(--mono);font-size:11px;color:var(--success);line-height:1.4;}
+.passed-item::before{content:'✓';font-weight:700;flex-shrink:0;}
+.issues-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:600px){.issues-grid{grid-template-columns:1fr;}}
+
+/* Grammar */
+.grammar-issue{background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:8px;border-left:3px solid var(--accent3);}
+.grammar-issue-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;gap:8px;flex-wrap:wrap;}
+.grammar-original{font-family:var(--mono);font-size:11px;color:var(--danger);text-decoration:line-through;margin-top:4px;}
+.grammar-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
+.grammar-fix{background:rgba(104,211,145,.15);color:var(--success);border-radius:4px;padding:3px 10px;font-family:var(--mono);font-size:11px;}
+.grammar-context{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px;font-style:italic;}
+
+/* Loading */
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,15,.85);backdrop-filter:blur(8px);z-index:200;align-items:center;justify-content:center;flex-direction:column;gap:20px;}
+.loading-overlay.show{display:flex;}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-family:var(--mono);font-size:13px;color:var(--muted);}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-family:var(--mono);font-size:13px;z-index:300;opacity:0;transition:all .3s;max-width:90vw;text-align:center;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+.toast.success{border-color:var(--success);color:var(--success);}
+.toast.error{border-color:var(--danger);color:var(--danger);}
+
+/* Bottom nav */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,.97);border-top:1px solid var(--border);padding:8px 0 max(8px,env(safe-area-inset-bottom));z-index:100;backdrop-filter:blur(12px);}
+.bottom-nav-inner{display:flex;justify-content:space-around;}
+.bnav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--muted);font-family:var(--sans);font-size:10px;font-weight:600;cursor:pointer;padding:4px 10px;border-radius:8px;transition:color .2s;}
+.bnav-icon{font-size:19px;}
+.bnav-btn.active{color:var(--accent);}
+@media(max-width:640px){nav{display:none;}.bottom-nav{display:block;}body{padding-bottom:72px;}}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-family:var(--mono);font-size:13px;}
+.empty-icon{font-size:36px;margin-bottom:10px;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.animate-in{animation:fadeIn .3s ease forwards;}
+.hidden{display:none!important;}
+.divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted);font-family:var(--mono);font-size:11px;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="login-page">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="auth-logo-icon">📋</div>
+        <div><div class="auth-logo-text">ThesisGuard</div><div class="auth-logo-sub">Academic Integrity System</div></div>
+      </div>
+      <h2>Welcome back</h2>
+      <p class="auth-sub">Sign in to your account to continue.</p>
+      <div class="field"><label>Email Address</label><input type="email" id="login-email" placeholder="you@university.edu" autocomplete="email"></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"></div>
+      <div id="login-error" class="error-msg hidden"></div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()">Sign In →</button>
+      <div class="auth-switch">Don't have an account? <a onclick="showSignup()">Sign up</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- SIGNUP PAGE -->
+<div id="signup-page" class="hidden">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="auth-logo-icon">📋</div>
+        <div><div class="auth-logo-text">ThesisGuard</div><div class="auth-logo-sub">Academic Integrity System</div></div>
+      </div>
+      <h2>Create account</h2>
+      <p class="auth-sub">Sign up to submit and verify your thesis. All new accounts start as Student — your teacher or admin can update your role.</p>
+      <div class="field"><label>Full Name</label><input type="text" id="signup-name" placeholder="Your full name"></div>
+      <div class="field"><label>Email Address</label><input type="email" id="signup-email" placeholder="you@university.edu"></div>
+      <div class="field"><label>Password (min 8 characters)</label><input type="password" id="signup-password" placeholder="••••••••"></div>
+      <div class="field"><label>Confirm Password</label><input type="password" id="signup-confirm" placeholder="••••••••"></div>
+      <div id="signup-error" class="error-msg hidden"></div>
+      <button class="btn btn-primary btn-full" onclick="doSignup()">Create Account →</button>
+      <div class="auth-switch">Already have an account? <a onclick="showLogin()">Sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden">
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📋</div>
+    <div><div class="logo-text">ThesisGuard</div><div class="logo-sub">Academic Integrity System</div></div>
+  </div>
+  <nav>
+    <button class="nav-btn active" onclick="showPage('dashboard')">Dashboard</button>
+    <button class="nav-btn" onclick="showPage('templates')">Templates</button>
+    <button class="nav-btn" onclick="showPage('upload')">Upload</button>
+    <button class="nav-btn" onclick="showPage('history')">History</button>
+    <button class="nav-btn" onclick="showPage('report')">Report</button>
+    <button class="nav-btn admin-only hidden" onclick="showPage('admin')">Admin</button>
+  </nav>
+  <div class="header-right">
+    <div class="user-chip"><span id="header-email"></span><span class="role-badge" id="header-role"></span></div>
+    <button class="btn btn-outline btn-sm" onclick="doLogout()">Logout</button>
+  </div>
+</header>
+
+<div class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <button class="bnav-btn active" onclick="showPage('dashboard')"><span class="bnav-icon">🏠</span>Home</button>
+    <button class="bnav-btn" onclick="showPage('templates')"><span class="bnav-icon">📐</span>Templates</button>
+    <button class="bnav-btn" onclick="showPage('upload')"><span class="bnav-icon">📤</span>Upload</button>
+    <button class="bnav-btn" onclick="showPage('history')"><span class="bnav-icon">📋</span>History</button>
+    <button class="bnav-btn" onclick="showPage('report')"><span class="bnav-icon">📊</span>Report</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div class="wrap">
+    <div style="margin-bottom:28px;" class="animate-in">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">// Academic Verification</div>
+      <h1 style="font-size:clamp(26px,6vw,44px);font-weight:800;letter-spacing:-1px;margin-bottom:10px;">Thesis<span style="color:var(--accent);">Guard</span></h1>
+      <p style="color:var(--muted);font-size:14px;max-width:480px;line-height:1.6;font-family:var(--mono);" id="dash-welcome">Template-driven compliance checking with AI-risk estimation and plagiarism detection.</p>
+    </div>
+    <div class="stats-row animate-in">
+      <div class="stat-card"><div class="stat-label">Templates</div><div class="stat-value" id="stat-templates">—</div></div>
+      <div class="stat-card"><div class="stat-label">Submissions</div><div class="stat-value" id="stat-submissions">—</div></div>
+      <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value" id="stat-avg">—</div></div>
+      <div class="stat-card"><div class="stat-label">Status</div><div class="stat-value" style="font-size:16px;color:var(--success);">● Online</div></div>
+    </div>
+    <div class="charts-row animate-in">
+      <div class="chart-card"><div class="chart-title">AI Risk Distribution</div><canvas id="chart-ai" height="180"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Overview</div><canvas id="chart-sub" height="180"></canvas></div>
+    </div>
+    <div class="actions-grid animate-in">
+      <div class="action-card" onclick="showPage('upload')"><div class="action-icon teal">📤</div><div class="action-content"><h3>Upload Thesis</h3><p>Submit a DOCX or PDF for full verification.</p></div></div>
+      <div class="action-card" onclick="showPage('history')"><div class="action-icon orange">📋</div><div class="action-content"><h3>Submission History</h3><p>View all past submissions and reports.</p></div></div>
+      <div class="action-card" onclick="showPage('templates')"><div class="action-icon purple">📐</div><div class="action-content"><h3>Templates</h3><p>Browse available thesis templates.</p></div></div>
+      <div class="action-card admin-only hidden" onclick="showPage('admin')"><div class="action-icon red">⚙️</div><div class="action-content"><h3>Admin Panel</h3><p>Manage users and promote roles.</p></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TEMPLATES -->
+<div class="page" id="page-templates">
+  <div class="wrap-sm">
+    <div class="section-header">
+      <div class="section-title">Templates</div>
+      <button class="btn btn-primary teacher-only hidden" onclick="toggleTemplateForm()">+ New Template</button>
+    </div>
+    <div id="template-list"></div>
+    <div class="card" id="template-form" style="display:none;">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);">Create New Template</h3>
+      <div class="form-grid">
+        <div class="field form-full"><label>Template Name</label><input type="text" id="t-name" placeholder="e.g. CS Thesis 2026"></div>
+        <div class="field"><label>Document Type</label><input type="text" id="t-doctype" value="thesis"></div>
+        <div class="field"><label>Citation Style</label><input type="text" id="t-citation" placeholder="APA / MLA / IEEE"></div>
+        <div class="field"><label>Allowed Fonts (comma separated)</label><input type="text" id="t-fonts" placeholder="Times New Roman"></div>
+        <div class="field"><label>Font Sizes pt</label><input type="text" id="t-fontsizes" placeholder="12"></div>
+        <div class="field"><label>Line Spacing</label><input type="number" id="t-spacing" value="1.5" step="0.1" min="1" max="3"></div>
+        <div class="field form-full"><label>Required Sections (one per line)</label><textarea id="t-sections" rows="5" placeholder="Abstract&#10;Introduction&#10;Methodology&#10;Conclusion&#10;References"></textarea></div>
+        <div class="field form-full"><label>Heading Patterns (one per line)</label><textarea id="t-headings" rows="3" placeholder="Chapter 1&#10;Chapter 2"></textarea></div>
+        <div class="field form-full"><label>Margins (cm) — Top / Bottom / Left / Right</label>
+          <div class="margins-grid">
+            <input type="number" id="m-top" placeholder="Top" step="0.1" value="2.5">
+            <input type="number" id="m-bottom" placeholder="Bottom" step="0.1" value="2.5">
+            <input type="number" id="m-left" placeholder="Left" step="0.1" value="3.0">
+            <input type="number" id="m-right" placeholder="Right" step="0.1" value="2.5">
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-outline" onclick="toggleTemplateForm()">Cancel</button>
+        <button class="btn btn-primary" onclick="createTemplate()">Create Template</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div class="page" id="page-upload">
+  <div class="wrap-sm">
+    <div class="section-header"><div class="section-title">Upload Thesis</div></div>
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" accept=".docx,.pdf" onchange="onFileSelected(this)">
+      <div class="upload-icon">📄</div>
+      <h3>Drop your file here</h3>
+      <p>or tap to browse · DOCX or PDF · Max 50MB</p>
+    </div>
+    <div class="upload-selected" id="upload-selected"><span>📄</span><span id="selected-filename"></span></div>
+    <div class="field"><label>Select Template</label><select id="upload-template"><option value="">— choose a template —</option></select></div>
+    <div class="field" style="margin-top:10px;"><label>Resubmission? Enter previous submission ID (optional)</label><input type="number" id="resubmit-id" placeholder="Leave blank for new submission"></div>
+    <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="uploadThesis()">Verify Thesis →</button>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="page" id="page-history">
+  <div class="wrap">
+    <div class="section-header">
+      <div class="section-title">Submission History</div>
+      <button class="btn btn-outline btn-sm" onclick="loadHistory()">↻ Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>File</th><th>Score</th><th>AI Risk</th><th>Ver</th><th>Date</th><th>User</th><th></th></tr></thead>
+        <tbody id="history-tbody"><tr><td colspan="8"><div class="empty-state">Loading...</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- REPORT -->
+<div class="page" id="page-report">
+  <div class="wrap-sm">
+    <div class="section-header">
+      <div class="section-title">Report</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="number" id="report-id-input" placeholder="Submission ID" min="1" style="width:150px;">
+        <button class="btn btn-primary" onclick="loadReport()">Load</button>
+        <button class="btn btn-outline" id="pdf-btn" style="display:none;" onclick="downloadPDF()">⬇ PDF</button>
+      </div>
+    </div>
+    <div id="report-content"><div class="empty-state"><div class="empty-icon">📊</div>Enter a submission ID and tap Load</div></div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div class="page" id="page-admin">
+  <div class="wrap">
+    <div class="section-header"><div class="section-title">Admin Panel</div></div>
+    <div class="card">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:16px;">👥 User Management — Promote students to Teacher or deactivate accounts</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="users-tbody"><tr><td colspan="6"><div class="empty-state">Loading...</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end #app -->
+
+<div class="loading-overlay" id="loading"><div class="spinner"></div><div class="loading-text" id="loading-text">Processing...</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+let currentUser = null, aiChart = null, subChart = null, currentReportId = null;
+
+// ── Init ──────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const r = await fetch('/auth/me');
+    if (r.ok) { currentUser = await r.json(); showApp(); }
+    else showLogin();
+  } catch { showLogin(); }
+}
+
+function showLogin() {
+  document.getElementById('login-page').classList.remove('hidden');
+  document.getElementById('signup-page').classList.add('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
+
+function showSignup() {
+  document.getElementById('signup-page').classList.remove('hidden');
+  document.getElementById('login-page').classList.add('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
+
+function showApp() {
+  document.getElementById('login-page').classList.add('hidden');
+  document.getElementById('signup-page').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('header-email').textContent = currentUser.email;
+  const rb = document.getElementById('header-role');
+  rb.textContent = currentUser.role; rb.className = `role-badge role-${currentUser.role}`;
+  if (currentUser.role === 'admin') {
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+    document.querySelectorAll('.teacher-only').forEach(el => el.classList.remove('hidden'));
+  }
+  if (currentUser.role === 'teacher') {
+    document.querySelectorAll('.teacher-only').forEach(el => el.classList.remove('hidden'));
+  }
+  const welcome = {
+    admin: "Welcome, Admin. You have full control over users, templates and submissions.",
+    teacher: "Welcome. You can create templates and review all student submissions.",
+    student: "Welcome. Upload your thesis and view your verification reports below.",
+  };
+  document.getElementById('dash-welcome').textContent = welcome[currentUser.role] || '';
+  loadDashboard();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.add('hidden');
+  if (!email || !password) { errEl.textContent = 'Please enter your email and password.'; errEl.classList.remove('hidden'); return; }
+  setLoading(true, 'Signing in...');
+  try {
+    const r = await fetch('/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email, password}) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Login failed');
+    currentUser = { email: d.email, role: d.role, full_name: d.full_name };
+    showApp();
+  } catch(e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+  finally { setLoading(false); }
+}
+
+async function doSignup() {
+  const full_name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const confirm = document.getElementById('signup-confirm').value;
+  const errEl = document.getElementById('signup-error');
+  errEl.classList.add('hidden');
+  if (!email || !password) { errEl.textContent = 'Please fill in all fields.'; errEl.classList.remove('hidden'); return; }
+  if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.classList.remove('hidden'); return; }
+  if (password !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.classList.remove('hidden'); return; }
+  setLoading(true, 'Creating account...');
+  try {
+    const r = await fetch('/auth/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email, password, full_name}) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Signup failed');
+    showToast('Account created! Please sign in.');
+    showLogin();
+  } catch(e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+  finally { setLoading(false); }
+}
+
+async function doLogout() {
+  await fetch('/auth/logout', {method:'POST'});
+  currentUser = null; showLogin();
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const lp = document.getElementById('login-page');
+    const sp = document.getElementById('signup-page');
+    if (!lp.classList.contains('hidden')) doLogin();
+    else if (!sp.classList.contains('hidden')) doSignup();
+  }
+});
+
+// ── Nav ───────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn,.bnav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn,.bnav-btn').forEach(b => {
+    if (b.getAttribute('onclick')?.includes(`'${name}'`)) b.classList.add('active');
+  });
+  const loaders = { templates: loadTemplates, upload: loadTemplatesForUpload, history: loadHistory, admin: loadUsers };
+  if (loaders[name]) loaders[name]();
+  window.scrollTo(0, 0);
+}
+
+// ── Toast / Loading ───────────────────────────────────────────────
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast show ${type}`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+function setLoading(show, text='Processing...') {
+  document.getElementById('loading-text').textContent = text;
+  document.getElementById('loading').classList.toggle('show', show);
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const r = await fetch('/stats');
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('stat-templates').textContent = d.total_templates;
+    document.getElementById('stat-submissions').textContent = d.total_submissions;
+    document.getElementById('stat-avg').textContent = d.avg_compliance_score || '—';
+    const aiCtx = document.getElementById('chart-ai').getContext('2d');
+    if (aiChart) aiChart.destroy();
+    aiChart = new Chart(aiCtx, { type:'doughnut', data:{ labels:['Low','Medium','High'], datasets:[{data:[d.ai_risk_distribution.low,d.ai_risk_distribution.medium,d.ai_risk_distribution.high],backgroundColor:['#68d391','#f6ad55','#fc8181'],borderWidth:0}]}, options:{plugins:{legend:{labels:{color:'#6b6b8a',font:{size:11}}}},cutout:'65%',responsive:true}});
+    const subCtx = document.getElementById('chart-sub').getContext('2d');
+    if (subChart) subChart.destroy();
+    subChart = new Chart(subCtx, { type:'bar', data:{ labels:['Total','Avg Score'], datasets:[{data:[d.total_submissions,d.avg_compliance_score],backgroundColor:['#7c6af7','#4fd1c5'],borderRadius:6,borderWidth:0}]}, options:{plugins:{legend:{display:false}},scales:{y:{ticks:{color:'#6b6b8a'},grid:{color:'rgba(42,42,58,.5)'}},x:{ticks:{color:'#6b6b8a'},grid:{display:false}}},responsive:true}});
+  } catch {}
+}
+
+// ── Templates ─────────────────────────────────────────────────────
+async function loadTemplates() {
+  try {
+    const templates = await (await fetch('/templates')).json();
+    const list = document.getElementById('template-list');
+    if (!templates.length) { list.innerHTML = '<div class="empty-state"><div class="empty-icon">📐</div>No templates yet.</div>'; return; }
+    list.innerHTML = templates.map(t => `
+      <div class="card animate-in" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${t.name}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);">
+            <span>ID: ${t.id}</span><span>${t.document_type}</span><span>${t.required_sections?.length||0} sections</span>${t.citation_style?`<span>${t.citation_style}</span>`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <span class="tag tag-accent">${t.allowed_fonts?.[0]||'Any'}</span>
+          <span class="tag tag-teal">${t.line_spacing}× spacing</span>
+          ${currentUser?.role==='admin'||currentUser?.role==='teacher'?`<button class="btn btn-danger btn-sm" onclick="deleteTemplate(${t.id})">Delete</button>`:''}
+        </div>
+      </div>`).join('');
+  } catch { showToast('Failed to load templates','error'); }
+}
+
+function toggleTemplateForm() {
+  const f = document.getElementById('template-form');
+  f.style.display = f.style.display==='none'?'block':'none';
+  if (f.style.display==='block') f.scrollIntoView({behavior:'smooth'});
+}
+
+async function createTemplate() {
+  const name = document.getElementById('t-name').value.trim();
+  if (!name) { showToast('Name required','error'); return; }
+  const payload = {
+    name, document_type: document.getElementById('t-doctype').value||'thesis',
+    citation_style: document.getElementById('t-citation').value||null,
+    allowed_fonts: document.getElementById('t-fonts').value.split(',').map(s=>s.trim()).filter(Boolean)||['Times New Roman'],
+    allowed_font_sizes: document.getElementById('t-fontsizes').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n))||[12],
+    line_spacing: parseFloat(document.getElementById('t-spacing').value)||1.5,
+    required_sections: document.getElementById('t-sections').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    heading_patterns: document.getElementById('t-headings').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    margins_cm:{ top:parseFloat(document.getElementById('m-top').value)||2.5, bottom:parseFloat(document.getElementById('m-bottom').value)||2.5, left:parseFloat(document.getElementById('m-left').value)||3.0, right:parseFloat(document.getElementById('m-right').value)||2.5 }
+  };
+  setLoading(true,'Creating...');
+  try {
+    const r = await fetch('/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if (!r.ok) { const e=await r.json(); throw new Error(e.detail||'Failed'); }
+    showToast('Template created!'); toggleTemplateForm(); loadTemplates();
+  } catch(e) { showToast(e.message,'error'); }
+  finally { setLoading(false); }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Deactivate this template?')) return;
+  const r = await fetch(`/templates/${id}`,{method:'DELETE'});
+  if (r.ok) { showToast('Template deactivated'); loadTemplates(); }
+  else showToast('Failed','error');
+}
+
+// ── Upload ────────────────────────────────────────────────────────
+async function loadTemplatesForUpload() {
+  try {
+    const templates = await (await fetch('/templates')).json();
+    const sel = document.getElementById('upload-template');
+    sel.innerHTML = '<option value="">— choose a template —</option>' + templates.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+  } catch {}
+}
+
+function onFileSelected(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('selected-filename').textContent = file.name;
+  document.getElementById('upload-selected').classList.add('show');
+}
+
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e=>{e.preventDefault();zone.classList.add('dragover');});
+zone.addEventListener('dragleave', ()=>zone.classList.remove('dragover'));
+zone.addEventListener('drop', e=>{e.preventDefault();zone.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f){document.getElementById('file-input').files=e.dataTransfer.files;onFileSelected({files:e.dataTransfer.files});}});
+
+async function uploadThesis() {
+  const fileInput=document.getElementById('file-input'), templateId=document.getElementById('upload-template').value, resubmitId=document.getElementById('resubmit-id').value;
+  if (!fileInput.files[0]) { showToast('Please select a file','error'); return; }
+  if (!templateId) { showToast('Please select a template','error'); return; }
+  const formData = new FormData(); formData.append('file', fileInput.files[0]);
+  let url = `/submissions/upload?template_id=${templateId}`;
+  if (resubmitId) url += `&resubmit_of=${resubmitId}`;
+  setLoading(true,'Analysing thesis...');
+  try {
+    const r = await fetch(url,{method:'POST',body:formData});
+    if (!r.ok) { const e=await r.json(); throw new Error(e.detail||'Upload failed'); }
+    const data = await r.json();
+    showToast(`Submission #${data.id} processed!`);
+    document.getElementById('report-id-input').value = data.id;
+    setTimeout(()=>{showPage('report');loadReport();}, 800);
+  } catch(e) { showToast(e.message,'error'); }
+  finally { setLoading(false); }
+}
+
+// ── History ───────────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const submissions = await (await fetch('/submissions')).json();
+    const tbody = document.getElementById('history-tbody');
+    if (!submissions.length) { tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div>No submissions yet.</div></td></tr>'; return; }
+    document.getElementById('stat-submissions').textContent = submissions.length;
+    tbody.innerHTML = submissions.map(s => {
+      const sc = s.compliance_score, col = sc>=75?'var(--success)':sc>=50?'var(--accent3)':'var(--danger)';
+      const aiTag = s.ai_risk_level?`<span class="tag tag-${s.ai_risk_level==='low'?'success':s.ai_risk_level==='medium'?'warning':'danger'}">${s.ai_risk_level}</span>`:'—';
+      const showUser = currentUser?.role!=='student' && s.user_email ? `<td style="font-family:var(--mono);font-size:10px;color:var(--muted);">${s.user_email}</td>` : '<td>—</td>';
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:12px;">#${s.id}</td>
+        <td style="font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${s.original_filename}">${s.original_filename}</td>
+        <td style="font-weight:700;color:${col};">${sc??'—'}</td>
+        <td>${aiTag}</td>
+        <td style="font-family:var(--mono);font-size:11px;">v${s.version}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted);">${s.created_at?s.created_at.substring(0,10):'—'}</td>
+        ${showUser}
+        <td><button class="btn btn-outline btn-sm" onclick="openReport(${s.id})">View</button></td>
+      </tr>`;
+    }).join('');
+  } catch { showToast('Failed to load history','error'); }
+}
+
+function openReport(id) { document.getElementById('report-id-input').value=id; showPage('report'); loadReport(); }
+
+// ── Report ────────────────────────────────────────────────────────
+async function loadReport() {
+  const id = document.getElementById('report-id-input').value;
+  if (!id) { showToast('Enter a submission ID','error'); return; }
+  setLoading(true,'Loading report...');
+  try {
+    const r = await fetch(`/submissions/${id}/report`);
+    if (!r.ok) throw new Error('Report not found');
+    currentReportId = id;
+    document.getElementById('pdf-btn').style.display='inline-block';
+    renderReport(await r.json());
+  } catch(e) { showToast(e.message,'error'); document.getElementById('report-content').innerHTML=`<div class="empty-state"><div class="empty-icon">❌</div>${e.message}</div>`; }
+  finally { setLoading(false); }
+}
+
+function downloadPDF() { if (currentReportId) window.open(`/submissions/${currentReportId}/report/pdf`,'_blank'); }
+function scoreClass(s) { return s>=75?'score-high':s>=50?'score-mid':'score-low'; }
+
+function renderReport(d) {
+  const c=d.compliance, ai=d.ai_risk, pl=d.plagiarism, g=d.grammar||null;
+  const flagsHtml=(items,type)=>items.length
+    ?items.map(f=>`<div class="flag-item ${f.severity}"><div class="flag-label">${f.label}</div><div class="flag-detail">${f.details}${f.location_hint?' · '+f.location_hint:''}</div></div>`).join('')
+    :`<div class="flag-detail" style="margin-top:8px;color:var(--success)">No ${type} found ✓</div>`;
+  const reviewerSection = (currentUser?.role==='admin'||currentUser?.role==='teacher') ? `
+    <div class="report-card animate-in" style="border-color:rgba(246,173,85,.3);background:rgba(246,173,85,.03);">
+      <div class="report-card-title" style="color:var(--accent3);">Reviewer Notes</div>
+      <textarea id="reviewer-notes-input" rows="4" placeholder="Add notes for this submission..." style="margin-bottom:10px;"></textarea>
+      <button class="btn btn-primary btn-sm" onclick="saveNotes(${d.submission_id})">Save Notes</button>
+    </div>` : '';
+
+  document.getElementById('report-content').innerHTML = `
+    <div class="report-header animate-in">
+      <div style="flex:1;min-width:0;">
+        <div class="report-filename">📄 ${d.original_filename}</div>
+        <div class="report-meta">ID: ${d.submission_id} · Template: ${d.template_name}${d.created_at?'<br>'+d.created_at:''}</div>
+      </div>
+      <div class="score-badge"><div class="score-num ${scoreClass(c.compliance_score)}">${c.compliance_score}</div><div class="score-label">Compliance</div></div>
+    </div>
+    <div class="summary-card animate-in">${d.final_summary}</div>
+    <div class="report-grid animate-in">
+      <div class="report-card" style="margin-bottom:0;">
+        <div class="report-card-title">AI Risk</div>
+        <span class="risk-pill risk-${ai.risk_level}">${ai.risk_level} risk</span>
+        <div class="big-score ${scoreClass(100-ai.risk_score)}" style="margin-top:10px;">${ai.risk_score}%</div>
+        <div class="flag-detail" style="margin-bottom:8px;">AI-generation probability</div>
+        ${flagsHtml(ai.flagged_segments,'flagged segments')}
+      </div>
+      <div class="report-card" style="margin-bottom:0;">
+        <div class="report-card-title">Similarity</div>
+        <div class="big-score ${scoreClass(100-pl.similarity_score)}">${pl.similarity_score}%</div>
+        <div style="display:flex;gap:12px;margin:8px 0 10px;font-family:var(--mono);font-size:11px;color:var(--muted);flex-wrap:wrap;"><span>Exact: ${pl.exact_match_score}%</span><span>Near: ${pl.near_match_score}%</span></div>
+        ${pl.flagged_sources.length?pl.flagged_sources.map(s=>`<div class="flag-item warning"><div class="flag-label">${s.title}</div><div class="flag-detail">Exact: ${s.exact_match_score}% · Near: ${s.near_match_score}%</div></div>`).join(''):'<div class="flag-detail" style="color:var(--success)">No flagged sources ✓</div>'}
+      </div>
+    </div>
+    <div class="report-card animate-in">
+      <div class="report-card-title">Compliance Issues</div>
+      <div class="issues-grid">
+        <div><div class="flag-detail" style="margin-bottom:8px;color:var(--danger);">Errors (${c.errors.length})</div>${flagsHtml(c.errors,'errors')}</div>
+        <div><div class="flag-detail" style="margin-bottom:8px;color:var(--accent3);">Warnings (${c.warnings.length})</div>${flagsHtml(c.warnings,'warnings')}</div>
+      </div>
+    </div>
+    <div class="report-card animate-in">
+      <div class="report-card-title">Passed Checks (${c.passed_checks.length})</div>
+      <div class="passed-list">${c.passed_checks.map(p=>`<div class="passed-item">${p}</div>`).join('')||'<div class="flag-detail">No checks passed</div>'}</div>
+    </div>
+    ${g?`<div class="report-card animate-in">
+      <div class="report-card-title">Grammar & Language · LanguageTool</div>
+      ${g.notes.map(n=>`<div class="flag-detail" style="margin-bottom:8px;">${n}</div>`).join('')}
+      ${g.total_issues>0?`<div style="display:flex;gap:16px;margin:10px 0;font-family:var(--mono);font-size:12px;flex-wrap:wrap;"><span style="color:var(--danger);">● ${g.error_count} errors</span><span style="color:var(--accent3);">● ${g.warning_count} warnings</span></div>
+      ${g.issues.slice(0,20).map(issue=>`<div class="grammar-issue"><div class="grammar-issue-header"><span class="flag-label">${issue.short_message||issue.message}</span><span class="tag tag-accent" style="font-size:10px;">${issue.category}</span></div><div class="flag-detail">${issue.message}</div>${issue.original?`<div class="grammar-original">${issue.original}</div>`:''}${issue.context?`<div class="grammar-context">"${issue.context}"</div>`:''}${issue.suggestions.length?`<div class="grammar-suggestions">${issue.suggestions.map(s=>`<span class="grammar-fix">✓ ${s}</span>`).join('')}</div>`:''}</div>`).join('')}
+      ${g.issues.length>20?`<div class="flag-detail" style="margin-top:8px;color:var(--muted);">...and ${g.issues.length-20} more.</div>`:''}`:''}
+    </div>`:''}
+    ${reviewerSection}
+    <div class="report-card animate-in"><div class="report-card-title">File Integrity · SHA-256</div><div class="hash-box">${d.file_hash_sha256}</div></div>
+  `;
+}
+
+async function saveNotes(id) {
+  const notes = document.getElementById('reviewer-notes-input').value;
+  const r = await fetch(`/submissions/${id}/notes`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewer_notes:notes})});
+  if (r.ok) showToast('Notes saved'); else showToast('Failed','error');
+}
+
+// ── Admin ─────────────────────────────────────────────────────────
+async function loadUsers() {
+  if (currentUser?.role!=='admin') return;
+  try {
+    const users = await (await fetch('/users')).json();
+    document.getElementById('users-tbody').innerHTML = users.map(u=>`
+      <tr>
+        <td style="font-family:var(--mono);font-size:12px;">${u.id}</td>
+        <td style="font-size:13px;">${u.email}</td>
+        <td style="font-size:12px;color:var(--muted);">${u.full_name||'—'}</td>
+        <td>
+          <select onchange="updateRole(${u.id},this.value)" style="padding:4px 8px;font-size:12px;width:auto;">
+            <option ${u.role==='student'?'selected':''} value="student">Student</option>
+            <option ${u.role==='teacher'?'selected':''} value="teacher">Teacher</option>
+            <option ${u.role==='admin'?'selected':''} value="admin">Admin</option>
+          </select>
+        </td>
+        <td><span class="tag ${u.is_active?'tag-success':'tag-danger'}">${u.is_active?'Active':'Inactive'}</span></td>
+        <td><button class="btn btn-outline btn-sm" onclick="toggleActive(${u.id},${u.is_active})">${u.is_active?'Deactivate':'Activate'}</button></td>
+      </tr>`).join('');
+  } catch { showToast('Failed to load users','error'); }
+}
+
+async function updateRole(userId, role) {
+  const r = await fetch(`/users/${userId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({role})});
+  if (r.ok) showToast('Role updated ✓'); else showToast('Failed','error');
+}
+
+async function toggleActive(userId, active) {
+  const r = await fetch(`/users/${userId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_active:!active})});
+  if (r.ok) { showToast('User updated'); loadUsers(); } else showToast('Failed','error');
+}
+
+init();
+</script>
+</body>
+</html>
