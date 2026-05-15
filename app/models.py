@@ -43,3 +43,13 @@ class Submission(Base):
     template = relationship("Template", back_populates="submissions")
     user = relationship("User", back_populates="submissions")
     resubmissions = relationship("Submission", backref="parent", remote_side="Submission.id", foreign_keys="Submission.parent_submission_id")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(128), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False)
+    used = Column(Boolean, default=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -345,3 +345,103 @@ async def extract_template(
     payload = TemplateCreate(**{k: v for k, v in config.items() if k != "name"},
                               name=name, margins_cm=Margins(**config["margins_cm"]))
     return TemplateResponse(id=t.id, **payload.model_dump())
+
+
+# ── Password Reset ────────────────────────────────────────────────
+from app.schemas import PasswordResetRequest, PasswordResetConfirm
+from app.models import PasswordResetToken
+import secrets as _secrets
+from datetime import datetime, timedelta, timezone as _tz
+
+@app.post("/auth/forgot-password")
+def forgot_password(payload: PasswordResetRequest, db: Session = Depends(get_db)):
+    """Generate a reset token. In dev mode prints to console. In prod sends email."""
+    user = db.query(User).filter(User.email == payload.email.lower().strip()).first()
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"message": "If this email exists, a reset link has been sent."}
+
+    # Invalidate old tokens
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.email == user.email,
+        PasswordResetToken.used == False
+    ).delete()
+
+    token = _secrets.token_urlsafe(48)
+    expires = datetime.now(_tz.utc) + timedelta(minutes=30)
+    db.add(PasswordResetToken(token=token, email=user.email, expires_at=expires))
+    db.commit()
+
+    reset_link = f"{settings.app_base_url}/reset-password?token={token}"
+
+    # Try to send email via Gmail if configured
+    if settings.gmail_user and settings.gmail_password:
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            msg = MIMEText(f"""
+Hi,
+
+You requested a password reset for your ThesisGuard account.
+
+Click this link to reset your password (expires in 30 minutes):
+{reset_link}
+
+If you didn't request this, ignore this email.
+
+— ThesisGuard
+            """)
+            msg['Subject'] = 'ThesisGuard — Reset your password'
+            msg['From'] = settings.gmail_user
+            msg['To'] = user.email
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+                smtp.login(settings.gmail_user, settings.gmail_password)
+                smtp.send_message(msg)
+        except Exception as e:
+            print(f"Email failed: {e}")
+
+    # Always print to console for dev/admin visibility
+    print(f"\n{'='*60}")
+    print(f"PASSWORD RESET for: {user.email}")
+    print(f"Link: {reset_link}")
+    print(f"Expires in 30 minutes, single use")
+    print(f"{'='*60}\n")
+
+    return {"message": "If this email exists, a reset link has been sent.", "dev_token": token}
+
+
+@app.post("/auth/reset-password")
+def reset_password(payload: PasswordResetConfirm, db: Session = Depends(get_db)):
+    """Verify token and set new password."""
+    token_record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == payload.token
+    ).first()
+
+    if not token_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
+    if token_record.used:
+        raise HTTPException(status_code=400, detail="This reset link has already been used.")
+    if datetime.now(_tz.utc) > token_record.expires_at.replace(tzinfo=_tz.utc):
+        raise HTTPException(status_code=400, detail="This reset link has expired. Please request a new one.")
+
+    # Mark token as used immediately
+    token_record.used = True
+    db.commit()
+
+    # Update password
+    user = db.query(User).filter(User.email == token_record.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    from app.auth import hash_password
+    user.password_hash = hash_password(payload.new_password)
+    db.commit()
+
+    return {"message": "Password updated successfully. You can now log in."}
+
+
+@app.get("/reset-password", include_in_schema=False)
+def reset_password_page():
+    """Serve the frontend for the reset password flow."""
+    index = STATIC_DIR / "index.html"
+    return FileResponse(str(index)) if index.exists() else {"message": "Not found"}
