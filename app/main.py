@@ -342,8 +342,10 @@ async def extract_template(
     db.add(t); db.commit(); db.refresh(t)
 
     from app.schemas import TemplateCreate, Margins
-    payload = TemplateCreate(**{k: v for k, v in config.items() if k != "name"},
-                              name=name, margins_cm=Margins(**config["margins_cm"]))
+    config_for_schema = {k: v for k, v in config.items() if k not in ("name", "margins_cm")}
+    config_for_schema["margins_cm"] = Margins(**config["margins_cm"])
+    config_for_schema["name"] = name
+    payload = TemplateCreate(**config_for_schema)
     return TemplateResponse(id=t.id, **payload.model_dump())
 
 
