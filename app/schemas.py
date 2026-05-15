@@ -56,7 +56,7 @@ class SubmissionResponse(BaseModel):
 
 # Auth
 class SignupRequest(BaseModel):
-    email: str; password: str = Field(min_length=8); full_name: str | None = None
+    email: str; password: str = Field(min_length=8, max_length=72); full_name: str | None = None
 
 class LoginRequest(BaseModel):
     email: str; password: str
