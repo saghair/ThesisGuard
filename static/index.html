@@ -324,9 +324,30 @@ tr:hover td{background:rgba(124,106,247,.03);}
   <div class="wrap-sm">
     <div class="section-header">
       <div class="section-title">Templates</div>
-      <button class="btn btn-primary teacher-only hidden" onclick="toggleTemplateForm()">+ New Template</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary teacher-only hidden" onclick="toggleTemplateForm()">+ New Template</button>
+        <button class="btn btn-outline teacher-only hidden" onclick="toggleExtractForm()">📄 Extract from File</button>
+      </div>
     </div>
     <div id="template-list"></div>
+    <!-- Extract template from example file -->
+    <div class="card" id="extract-form" style="display:none;margin-bottom:12px;">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:6px;padding-bottom:14px;border-bottom:1px solid var(--border);">📄 Extract Template from Example Thesis</h3>
+      <p style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.6;">Upload an example thesis file and the app will automatically read its fonts, margins, line spacing and sections to create a template.</p>
+      <div class="field"><label>Template Name</label><input type="text" id="ex-name" placeholder="e.g. CS Thesis Standard 2026"></div>
+      <div class="upload-zone" id="extract-zone" style="padding:28px;margin-bottom:14px;">
+        <input type="file" id="extract-file" accept=".docx,.pdf" onchange="onExtractFileSelected(this)">
+        <div class="upload-icon" style="font-size:28px;margin-bottom:6px;">📎</div>
+        <h3 style="font-size:14px;">Drop example thesis here</h3>
+        <p>DOCX or PDF</p>
+      </div>
+      <div class="upload-selected" id="extract-selected"><span>📄</span><span id="extract-filename"></span></div>
+      <div class="form-actions">
+        <button class="btn btn-outline" onclick="toggleExtractForm()">Cancel</button>
+        <button class="btn btn-primary" onclick="extractTemplate()">Extract & Create Template</button>
+      </div>
+    </div>
+
     <div class="card" id="template-form" style="display:none;">
       <h3 style="font-size:16px;font-weight:700;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);">Create New Template</h3>
       <div class="form-grid">
@@ -805,6 +826,39 @@ async function updateRole(userId, role) {
 async function toggleActive(userId, active) {
   const r = await fetch(`/users/${userId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_active:!active})});
   if (r.ok) { showToast('User updated'); loadUsers(); } else showToast('Failed','error');
+}
+
+// ── Extract template ─────────────────────────────────────────────
+function toggleExtractForm() {
+  const f = document.getElementById('extract-form');
+  document.getElementById('template-form').style.display = 'none';
+  f.style.display = f.style.display==='none'?'block':'none';
+  if (f.style.display==='block') f.scrollIntoView({behavior:'smooth'});
+}
+
+function onExtractFileSelected(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('extract-filename').textContent = file.name;
+  document.getElementById('extract-selected').classList.add('show');
+}
+
+async function extractTemplate() {
+  const name = document.getElementById('ex-name').value.trim();
+  const fileInput = document.getElementById('extract-file');
+  if (!name) { showToast('Please enter a template name','error'); return; }
+  if (!fileInput.files[0]) { showToast('Please select a file','error'); return; }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  setLoading(true,'Extracting template from file...');
+  try {
+    const r = await fetch(`/templates/extract?name=${encodeURIComponent(name)}`,{method:'POST',body:formData});
+    if (!r.ok) { const e=await r.json(); throw new Error(e.detail||'Extraction failed'); }
+    const t = await r.json();
+    showToast(`Template "${t.name}" created from file!`);
+    toggleExtractForm();
+    loadTemplates();
+  } catch(e) { showToast(e.message,'error'); }
+  finally { setLoading(false); }
 }
 
 init();
