@@ -447,3 +447,58 @@ def reset_password_page():
     """Serve the frontend for the reset password flow."""
     index = STATIC_DIR / "index.html"
     return FileResponse(str(index)) if index.exists() else {"message": "Not found"}
+
+
+# ── Extract template from REQUIREMENTS/GUIDANCE document ─────────
+@app.post("/templates/extract-requirements", response_model=TemplateResponse)
+async def extract_requirements_template(
+    name: str = Query(..., description="Name for the new template"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_teacher),
+):
+    """
+    Upload a thesis guidance or requirements document.
+    The app reads the content rules, required sections and structure
+    and creates a template from them.
+    """
+    from app.services.requirements_extractor import extract_requirements_from_guidance
+
+    original_name = file.filename or "guidance.docx"
+    suffix = Path(original_name).suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Only DOCX and PDF files are accepted.")
+
+    if db.query(Template).filter(Template.name == name).first():
+        raise HTTPException(status_code=400, detail="A template with this name already exists.")
+
+    unique_id = uuid.uuid4().hex
+    destination = UPLOAD_DIR / f"guidance_{unique_id}{suffix}"
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 50 MB limit.")
+    destination.write_bytes(content)
+
+    try:
+        config, rules = extract_requirements_from_guidance(destination, name)
+    except Exception as exc:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=f"Could not read requirements: {exc}")
+    finally:
+        destination.unlink(missing_ok=True)
+
+    import json as _json
+    t = Template(
+        name=name,
+        document_type="thesis",
+        config_json=_json.dumps(config),
+        created_by=current_user.id,
+    )
+    db.add(t); db.commit(); db.refresh(t)
+
+    from app.schemas import TemplateCreate, Margins
+    config_for_schema = {k: v for k, v in config.items() if k not in ("name", "margins_cm")}
+    config_for_schema["margins_cm"] = Margins(**config["margins_cm"])
+    config_for_schema["name"] = name
+    payload = TemplateCreate(**config_for_schema)
+    return TemplateResponse(id=t.id, **payload.model_dump())

@@ -379,10 +379,29 @@ tr:hover td{background:rgba(124,106,247,.03);}
       <div class="section-title">Templates</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary teacher-only hidden" onclick="toggleTemplateForm()">+ New Template</button>
-        <button class="btn btn-outline teacher-only hidden" onclick="toggleExtractForm()">📄 Extract from File</button>
+        <button class="btn btn-outline teacher-only hidden" onclick="toggleExtractForm()">📄 Extract from Example</button>
+        <button class="btn btn-outline teacher-only hidden" onclick="toggleRequirementsForm()" style="border-color:var(--accent2);color:var(--accent2);">📋 Upload Requirements Doc</button>
       </div>
     </div>
     <div id="template-list"></div>
+    <!-- Upload requirements/guidance document -->
+    <div class="card" id="requirements-form" style="display:none;margin-bottom:12px;border-color:rgba(79,209,197,.3);">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:6px;padding-bottom:14px;border-bottom:1px solid var(--border);">📋 Create Template from Requirements Document</h3>
+      <p style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.6;">Upload your university's thesis guidance or requirements document (DOCX or PDF). The app will read the required sections, content rules, chapter structure and academic requirements automatically.</p>
+      <div class="field"><label>Template Name</label><input type="text" id="req-name" placeholder="e.g. Master Thesis Requirements 2026"></div>
+      <div class="upload-zone" id="req-zone" style="padding:28px;margin-bottom:14px;border-color:rgba(79,209,197,.4);">
+        <input type="file" id="req-file" accept=".docx,.pdf" onchange="onReqFileSelected(this)">
+        <div class="upload-icon" style="font-size:28px;margin-bottom:6px;">📋</div>
+        <h3 style="font-size:14px;">Drop requirements document here</h3>
+        <p>DOCX or PDF · Thesis guidance, rules, or marking criteria</p>
+      </div>
+      <div class="upload-selected" id="req-selected"><span>📋</span><span id="req-filename"></span></div>
+      <div class="form-actions">
+        <button class="btn btn-outline" onclick="toggleRequirementsForm()">Cancel</button>
+        <button class="btn btn-primary" style="background:var(--accent2);" onclick="extractRequirements()">Extract Requirements & Create Template</button>
+      </div>
+    </div>
+
     <!-- Extract template from example file -->
     <div class="card" id="extract-form" style="display:none;margin-bottom:12px;">
       <h3 style="font-size:16px;font-weight:700;margin-bottom:6px;padding-bottom:14px;border-bottom:1px solid var(--border);">📄 Extract Template from Example Thesis</h3>
@@ -930,6 +949,40 @@ async function doReset() {
     document.getElementById('reset-form-view').classList.add('hidden');
     document.getElementById('reset-success').classList.remove('hidden');
   } catch(e) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+  finally { setLoading(false); }
+}
+
+// ── Requirements document ────────────────────────────────────────
+function toggleRequirementsForm() {
+  const f = document.getElementById('requirements-form');
+  document.getElementById('template-form').style.display = 'none';
+  document.getElementById('extract-form').style.display = 'none';
+  f.style.display = f.style.display==='none'?'block':'none';
+  if (f.style.display==='block') f.scrollIntoView({behavior:'smooth'});
+}
+
+function onReqFileSelected(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('req-filename').textContent = file.name;
+  document.getElementById('req-selected').classList.add('show');
+}
+
+async function extractRequirements() {
+  const name = document.getElementById('req-name').value.trim();
+  const fileInput = document.getElementById('req-file');
+  if (!name) { showToast('Please enter a template name','error'); return; }
+  if (!fileInput.files[0]) { showToast('Please select a file','error'); return; }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  setLoading(true,'Reading requirements document...');
+  try {
+    const r = await fetch(`/templates/extract-requirements?name=${encodeURIComponent(name)}`,{method:'POST',body:formData});
+    if (!r.ok) { const e=await r.json(); throw new Error(e.detail||'Failed'); }
+    const t = await r.json();
+    showToast(`Template "${t.name}" created from requirements doc!`);
+    toggleRequirementsForm();
+    loadTemplates();
+  } catch(e) { showToast(e.message,'error'); }
   finally { setLoading(false); }
 }
 
