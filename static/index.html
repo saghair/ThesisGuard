@@ -880,20 +880,29 @@ async function loadUsers() {
   if (currentUser?.role!=='admin') return;
   try {
     const users = await (await fetch('/users')).json();
+    const isAdmin = currentUser?.role === 'admin';
     document.getElementById('users-tbody').innerHTML = users.map(u=>`
       <tr>
         <td style="font-family:var(--mono);font-size:12px;">${u.id}</td>
         <td style="font-size:13px;">${u.email}</td>
         <td style="font-size:12px;color:var(--muted);">${u.full_name||'—'}</td>
         <td>
-          <select onchange="updateRole(${u.id},this.value)" style="padding:4px 8px;font-size:12px;width:auto;">
-            <option ${u.role==='student'?'selected':''} value="student">Student</option>
-            <option ${u.role==='teacher'?'selected':''} value="teacher">Teacher</option>
-            <option ${u.role==='admin'?'selected':''} value="admin">Admin</option>
-          </select>
+          ${isAdmin
+            ? `<select onchange="updateRole(${u.id},this.value)" style="padding:4px 8px;font-size:12px;width:auto;">
+                <option ${u.role==='student'?'selected':''} value="student">Student</option>
+                <option ${u.role==='teacher'?'selected':''} value="teacher">Teacher</option>
+                <option ${u.role==='admin'?'selected':''} value="admin">Admin</option>
+               </select>`
+            : `<span class="tag tag-accent">${u.role}</span>`
+          }
         </td>
         <td><span class="tag ${u.is_active?'tag-success':'tag-danger'}">${u.is_active?'Active':'Inactive'}</span></td>
-        <td><button class="btn btn-outline btn-sm" onclick="toggleActive(${u.id},${u.is_active})">${u.is_active?'Deactivate':'Activate'}</button></td>
+        <td>
+          ${isAdmin
+            ? `<button class="btn btn-outline btn-sm" onclick="toggleActive(${u.id},${u.is_active})">${u.is_active?'Deactivate':'Activate'}</button>`
+            : '—'
+          }
+        </td>
       </tr>`).join('');
   } catch { showToast('Failed to load users','error'); }
 }
